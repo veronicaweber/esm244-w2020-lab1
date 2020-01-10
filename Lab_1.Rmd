@@ -1,0 +1,98 @@
+---
+title: "Lab 1"
+author: "Veronica Weber"
+date: "1/9/2020"
+output: html_document
+# Here - used to direct R to gather data sets from different data pathways
+# Mutate - to change column asthetics while keeping the same column name (for instance changing the all caps text to lowercase)
+# String (str_to_lower) - commands the text to change from upper to lower case
+# ? (package) - use in the console - lets you find out what each package does, provides info
+# Parse_Number - removes $ symbol from data cells
+# String (str_remove) remove a string's pattern (keyword) from data cells
+# String (str_detect) search for a pattern (keyword) and isolate data cells that match that pattern
+# Separate - seperate data cells into different columns based on character/punctuation
+# Summarize - creates a summary table and also takes the group of variables selected and reduces them down to a single value based on what I choosed (total, mean, etc.)
+# GGsave - export a finished ggplot graph into specific folders 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(kableExtra)
+
+```
+
+Read in noaa_fisheries.csv data
+
+```{r}
+us_landings <- read_csv(here("data", "noaa_fisheries.csv"))
+```
+
+Make a tidy version of the data frame
+```{r}
+landings_tidy <- us_landings %>% 
+  janitor::clean_names() %>% 
+  mutate(state = str_to_lower(state),
+         afs_name = str_to_lower(afs_name)) %>% 
+  mutate(dollars_num = parse_number(dollars_usd))
+```
+
+Let's just get some information for salmon:
+
+```{r}
+salmon_landings <- landings_tidy %>% 
+  mutate(afs_clean = str_remove(afs_name, pattern = "aggregate")) %>% 
+  filter(str_detect(afs_clean, pattern = "salmon")) %>% 
+  separate(afs_clean, into = c("group", "species"), sep = ",")
+```
+
+Find some grouped summary data:
+
+Find annual total US landings and dollar value (summing across all states) for each TYPE of salmon using 'group_by' + 'summarize'
+
+```{r}
+salmon_summary <- salmon_landings %>% 
+  group_by(year, species) %>% 
+  summarize(
+    tot_landings = sum(landings_pounds),
+    tot_value = sum(dollars_num)
+  )
+```
+
+
+Create a graph for this info
+
+```{r}
+salmon_landings_graph <- ggplot(data = salmon_summary,
+                                aes(x = year, y = tot_landings)) +
+  geom_line(aes(color = species)) +
+  theme_minimal()
+
+salmon_landings_graph
+
+```
+
+Now we'll export our graph with ggsave
+
+```{r}
+ggsave(plot = salmon_landings_graph,
+       here("figures", "us_salmon_vw.png"),
+       height = 5,
+       width = 8)
+```
+
+Let's make a nice table 
+```{r}
+salmon_first_5 <- salmon_summary %>% 
+  head(5)
+```
+
+use kable to create a nice clean summary table
+```{r}
+kable(salmon_first_5) %>% 
+  kable_styling(bootstrap_options = "striped",
+                full_width = FALSE)
+ ```
+
